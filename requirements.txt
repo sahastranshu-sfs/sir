@@ -5,3 +5,4 @@ scipy
 numpy
 textblob
 streamlit
+altair==4.2.2
