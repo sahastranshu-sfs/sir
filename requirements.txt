@@ -4,5 +4,5 @@ scikit-learn
 scipy
 numpy
 textblob
-streamlit
+streamlit>=1.41.0
 altair==4.2.2
