@@ -16,7 +16,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedShuffleSplit
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -98,7 +98,7 @@ def load_or_train_model():
     scaled_features = scaler.fit_transform(numerical_features)
     X_combined = hstack([X_tfidf, csr_matrix(scaled_features)])
 
-    X_train, X_test, y_train, y_test = train_test_split(X_combined, df['label'], test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X_combined, df['label'], test_size=0.2, random_state=42, stratify=df['label'])
 
     classifiers = {
         'lsvc': LinearSVC(random_state=42),
@@ -109,6 +109,17 @@ def load_or_train_model():
     }
     best_models = {}
 
+    X_train_gs = X_train
+    y_train_gs = y_train
+    max_gs_samples = 20000
+    if X_train.shape[0] > max_gs_samples:
+        splitter = StratifiedShuffleSplit(n_splits=1, train_size=max_gs_samples, random_state=42)
+        for idx, _ in splitter.split(X_train, y_train):
+            X_train_gs = X_train[idx]
+            if hasattr(y_train, "iloc"):
+                y_train_gs = y_train.iloc[idx]
+            else:
+                y_train_gs = y_train[idx]
     total_classifiers = len(classifiers)
     for i, (name, clf) in enumerate(classifiers.items()):
         print(f"Tuning {name}...")
@@ -125,8 +136,11 @@ def load_or_train_model():
             param_grid = {'hidden_layer_sizes': [(50,), (100,)], 'activation': ['relu', 'tanh'], 'max_iter': [300]}
 
         grid_search = GridSearchCV(clf, param_grid, cv=3, n_jobs=-1, scoring='accuracy')
-        grid_search.fit(X_train, y_train)
-        best_models[name] = grid_search.best_estimator_
+        grid_search.fit(X_train_gs, y_train_gs)
+        best_params = grid_search.best_params_
+        best_clf = clf.__class__(**best_params)
+        best_clf.fit(X_train, y_train)
+        best_models[name] = best_clf
         print(f"Finished {name}")
 
     print("Training complete! Saving model...")
@@ -224,13 +238,11 @@ def main():
                         pred = model.predict(input_combined)
                         preds.append(pred * weights[name])
                     final_pred = np.round(np.sum(preds, axis=0)).astype(int)[0]
-                    if matched_bow:
-                        final_pred = 0
-                    label = "Not Cyberbullying" if final_pred == 1 else "Cyberbullying"
+                    label = "Cyberbullying" if final_pred == 1 else "Not Cyberbullying"
                     if final_pred == 1:
-                        st.success("The message is NOT cyberbullying.")
-                    else:
                         st.error("The message is predicted to be CYBERBULLYING.")
+                    else:
+                        st.success("The message is NOT cyberbullying.")
                     if matched_bow:
                         st.warning(", ".join(matched_bow))
                     st.session_state["history"].append({"text": text[:80], "prediction": label})
@@ -276,8 +288,8 @@ def main():
                 for name, model in best_models.items():
                     preds_u.append(model.predict(X_u) * weights[name])
                 final_u = np.round(np.sum(preds_u, axis=0)).astype(int)
-                final_u[override_flags.values] = 0
-                dfu['prediction'] = np.where(final_u == 1, "Not Cyberbullying", "Cyberbullying")
+                final_u[override_flags.values] = 1
+                dfu['prediction'] = np.where(final_u == 1, "Cyberbullying", "Not Cyberbullying")
                 st.write("Preview")
                 st.dataframe(dfu[['text', 'prediction']].head(50))
                 if 'label' in dfu.columns:
