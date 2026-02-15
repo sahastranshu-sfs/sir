@@ -215,7 +215,13 @@ def main():
         st.subheader("Test the Model")
         if "history" not in st.session_state:
             st.session_state["history"] = []
-        text = st.text_area("Enter a message")
+        col_text, col_clear = st.columns([4, 1])
+        with col_text:
+            text = st.text_area("Enter a message")
+        with col_clear:
+            if st.button("Clear History"):
+                st.session_state["history"] = []
+                st.rerun()
         if st.button("Check"):
             if text:
                 if is_explicit_abuse(text):
