@@ -58,23 +58,17 @@ def get_lexicon():
     custom = set(st.session_state.get("custom_words", []))
     return base.union(custom)
 
+def get_explicit_words():
+    base = {"fuck", "bitch", "asshole", "motherfucker", "fucker", "bastard", "slut", "whore", "bhenchod", "chutiya"}
+    custom = set(st.session_state.get("explicit_words", []))
+    return base.union(custom)
+
 def is_explicit_abuse(text):
+    if not st.session_state.get("explicit_override_enabled", True):
+        return False
     t = text.lower()
-    patterns = [
-        r"\bfuck\w*\b",
-        r"\bbitch\w*\b",
-        r"\basshole\w*\b",
-        r"\bmotherfucker\w*\b",
-        r"\bfucker\w*\b",
-        r"\bbastard\w*\b",
-        r"\bslut\w*\b",
-        r"\bwhore\w*\b",
-        r"\bbhenchod\b",
-        r"\bchutiya\b",
-        r"\bmc\b",
-        r"\bbc\b"
-    ]
-    for p in patterns:
+    for w in get_explicit_words():
+        p = r"\b" + re.escape(w) + r"\w*\b"
         if re.search(p, t):
             return True
     return False
@@ -353,6 +347,10 @@ def main():
         st.subheader("Lexicon")
         if "custom_words" not in st.session_state:
             st.session_state["custom_words"] = []
+        if "explicit_words" not in st.session_state:
+            st.session_state["explicit_words"] = []
+        if "explicit_override_enabled" not in st.session_state:
+            st.session_state["explicit_override_enabled"] = True
         st.write(f"Total words: {len(get_lexicon())}")
         add_text = st.text_area("Add words (comma or newline separated)")
         c1, c2 = st.columns(2)
@@ -370,6 +368,23 @@ def main():
         if st.session_state["custom_words"]:
             st.write("Custom words")
             st.dataframe(pd.DataFrame({"word": st.session_state["custom_words"]}))
+        st.checkbox("Enable explicit override", key="explicit_override_enabled")
+        add_explicit = st.text_area("Add explicit override words (comma or newline separated)")
+        e1, e2 = st.columns(2)
+        if e1.button("Add Override Words"):
+            new_items = []
+            for part in re.split(r"[,\n]", add_explicit):
+                w = part.strip().lower()
+                if w:
+                    new_items.append(w)
+            st.session_state["explicit_words"] = list(sorted(set(st.session_state["explicit_words"]).union(new_items)))
+            st.success(f"Added {len(new_items)} override word(s).")
+        if e2.button("Clear Override Words"):
+            st.session_state["explicit_words"] = []
+            st.success("Cleared override words.")
+        if st.session_state["explicit_words"]:
+            st.write("Explicit override words")
+            st.dataframe(pd.DataFrame({"word": st.session_state["explicit_words"]}))
     with tabs[3]:
         st.subheader("Analytics")
         cm = artifacts.get('confusion_matrix', None)
