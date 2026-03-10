@@ -184,9 +184,67 @@ def load_or_train_model():
     
     return result
 
+def train_quick_model():
+    try:
+        df = pd.read_csv("anti-bully.csv", encoding="latin-1")
+    except FileNotFoundError:
+        df = pd.read_csv(r"c:\Users\PC\Desktop\sir\anti-bully.csv", encoding="latin-1")
+    df['clean_text'] = df['text'].apply(preprocess_text)
+    df = add_features(df, 'clean_text')
+    tfidf_vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=5000, min_df=2, max_df=0.95)
+    X_tfidf = tfidf_vectorizer.fit_transform(df['clean_text'])
+    scaler = StandardScaler()
+    numerical_features = df[['sentiment', 'text_length']].fillna(0)
+    scaled_features = scaler.fit_transform(numerical_features)
+    X_combined = hstack([X_tfidf, csr_matrix(scaled_features)])
+    X_train, X_test, y_train, y_test = train_test_split(X_combined, df['label'], test_size=0.2, random_state=42, stratify=df['label'])
+    best_models = {
+        'lsvc': LinearSVC(random_state=42),
+        'lr': LogisticRegression(random_state=42),
+        'rf': RandomForestClassifier(random_state=42, n_jobs=-1),
+        'dt': DecisionTreeClassifier(random_state=42),
+        'ann': MLPClassifier(hidden_layer_sizes=(100,), max_iter=300, random_state=42)
+    }
+    for name, clf in best_models.items():
+        clf.fit(X_train, y_train)
+    weights = {'lsvc': 0.2, 'lr': 0.2, 'rf': 0.2, 'dt': 0.2, 'ann': 0.2}
+    predictions = []
+    for name, model in best_models.items():
+        pred = model.predict(X_test)
+        predictions.append(pred * weights[name])
+    final_prediction = np.round(np.sum(predictions, axis=0)).astype(int)
+    metrics = {
+        'accuracy': accuracy_score(y_test, final_prediction),
+        'precision': precision_score(y_test, final_prediction, average='weighted'),
+        'recall': recall_score(y_test, final_prediction, average='weighted'),
+        'f1': f1_score(y_test, final_prediction, average='weighted'),
+        'roc_auc': roc_auc_score(y_test, final_prediction)
+    }
+    cm = confusion_matrix(y_test, final_prediction)
+    report = classification_report(y_test, final_prediction, output_dict=True)
+    artifacts = {
+        'confusion_matrix': cm,
+        'classification_report': report,
+        'y_test': y_test,
+        'final_prediction': final_prediction,
+        'trained_at': datetime.now().isoformat()
+    }
+    result = (best_models, weights, tfidf_vectorizer, scaler, metrics, artifacts)
+    joblib.dump(result, "cyberbullying_model.pkl")
+    return result
 def main():
     st.title("🛡️ Anti-Cyberbullying Model")
     st.sidebar.header("Model")
+    uploaded_model = st.sidebar.file_uploader("Upload pre-trained model (.pkl)", type=["pkl"])
+    if uploaded_model is not None:
+        try:
+            data_bytes = uploaded_model.read()
+            with open("cyberbullying_model.pkl", "wb") as f:
+                f.write(data_bytes)
+            st.sidebar.success("Model uploaded and saved.")
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Upload failed: {e}")
     retrain_clicked = st.sidebar.button("Retrain Model")
     if retrain_clicked:
         try:
@@ -197,7 +255,29 @@ def main():
         except Exception as e:
             st.sidebar.error(f"Could not clear cache: {e}")
         st.rerun()
-    data = load_or_train_model()
+    data = None
+    if os.path.exists("cyberbullying_model.pkl"):
+        try:
+            data = joblib.load("cyberbullying_model.pkl")
+        except Exception as e:
+            st.sidebar.error(f"Could not load saved model: {e}")
+    if data is None:
+        st.warning("No saved model found.")
+        c1, c2 = st.columns(2)
+        if c1.button("Train Full Model"):
+            with st.spinner("Training full model..."):
+                try:
+                    data = load_or_train_model()
+                except Exception as e:
+                    st.error(f"Training failed: {e}")
+        if c2.button("Train Quick Model"):
+            with st.spinner("Training quick model..."):
+                try:
+                    data = train_quick_model()
+                except Exception as e:
+                    st.error(f"Quick training failed: {e}")
+    if data is None:
+        return
     if isinstance(data, tuple) and len(data) == 6:
         best_models, weights, tfidf_vectorizer, scaler, metrics, artifacts = data
     else:
@@ -217,6 +297,14 @@ def main():
         c4, c5 = st.columns(2)
         c4.metric("F1 Score", f"{metrics['f1']:.4f}")
         c5.metric("AUC-ROC", f"{metrics['roc_auc']:.4f}")
+        cm_ov = artifacts.get('confusion_matrix', None)
+        if cm_ov is not None:
+            tn, fp, fn, tp = cm_ov.ravel()
+            d1, d2, d3, d4 = st.columns(4)
+            d1.metric("TP", f"{tp}")
+            d2.metric("TN", f"{tn}")
+            d3.metric("FP", f"{fp}")
+            d4.metric("FN", f"{fn}")
     with tabs[1]:
         st.subheader("Test the Model")
         if "history" not in st.session_state:
