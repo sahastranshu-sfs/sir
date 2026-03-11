@@ -352,7 +352,7 @@ def main():
             st.session_state["explicit_words"] = []
         if "explicit_override_enabled" not in st.session_state:
             st.session_state["explicit_override_enabled"] = True
-        st.write(f"Bag of Words: {len(get_lexicon())}")
+        st.write(f"Bag of Words")
         if st.button("Clear Custom Words"):
             st.session_state["custom_words"] = []
             st.success("Cleared custom words.")
