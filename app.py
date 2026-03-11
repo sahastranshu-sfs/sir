@@ -228,7 +228,7 @@ def train_quick_model():
     return result
 def main():
     st.title("🛡️ Hybrid Supervised Cyber-bully Detection System")
-    st.write("NOVEL METHOD TO DETECT CYBER-BULLY MESSAGES ON SOCIAL MEDIA USING SUPERVISED MACHINE LEARNING TECHNIQUE")
+
     st.sidebar.header("Model")
     uploaded_model = st.sidebar.file_uploader("Upload pre-trained model (.pkl)", type=["pkl"])
     if uploaded_model is not None:
@@ -402,9 +402,8 @@ def main():
         if cm is None and report is None:
             st.info("Analytics will be available after next training.")
     with tabs[4]:
-        st.markdown("This tool helps classify messages for cyberbullying risk and provides basic analytics.")
-    with tabs[4]:
-        st.markdown("This tool helps classify messages for cyberbullying risk and provides basic analytics.")
+        st.markdown("NOVEL METHOD TO DETECT CYBER-BULLY MESSAGES ON SOCIAL MEDIA USING SUPERVISED MACHINE LEARNING TECHNIQUE")
+   
 
 if __name__ == "__main__":
     main()
