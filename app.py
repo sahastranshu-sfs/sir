@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(page_title="Anti-Cyberbullying Model", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="HS-CBDS", page_icon="🛡️", layout="wide")
 import pandas as pd
 import re
 import nltk
@@ -227,7 +227,8 @@ def train_quick_model():
     joblib.dump(result, "cyberbullying_model.pkl")
     return result
 def main():
-    st.title("🛡️ Anti-Cyberbullying Model")
+    st.title("🛡️ Hybrid Supervised Cyber-bully Detection System")
+    st.write("NOVEL METHOD TO DETECT CYBER-BULLY MESSAGES ON SOCIAL MEDIA USING SUPERVISED MACHINE LEARNING TECHNIQUE")
     st.sidebar.header("Model")
     uploaded_model = st.sidebar.file_uploader("Upload pre-trained model (.pkl)", type=["pkl"])
     if uploaded_model is not None:
